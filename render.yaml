@@ -1,0 +1,28 @@
+# Use this file as the Blueprint Path; repository root remains the working dir.
+services:
+  - type: web
+    name: payment-planner
+    runtime: python
+    numInstances: 1
+    # Free classroom/demo deployment. Local SQLite and Chroma data are ephemeral.
+    plan: free
+    buildCommand: pip install -r PaymentPlannerDeployment/requirements.txt && python PaymentPlannerDeployment/warm_caches.py
+    startCommand: uvicorn PaymentPlannerDeployment.server:app --host 0.0.0.0 --port $PORT --workers 1 --no-access-log
+    healthCheckPath: /healthz
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.15
+      - key: PAYMENT_PLANNER_DATA_DIR
+        value: /tmp/payment-planner
+      - key: PAYMENT_PLANNER_MODE
+        value: fixture
+      - key: PAYMENT_PLANNER_ACCESS_TOKEN
+        generateValue: true
+      - key: PAYMENT_PLANNER_USER_ID
+        value: owner
+      - key: PAYMENT_PLANNER_MODEL
+        value: gpt-4.1-mini
+      - key: PAYMENT_PLANNER_LANGFUSE
+        value: "false"
+      - key: PAYMENT_PLANNER_COMPACTION
+        value: "false"
