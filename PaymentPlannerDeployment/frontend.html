@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Payment Planner</title>
+  <style>
+    body{font:16px system-ui;background:#f3f5f7;color:#152f39;margin:0}
+    main{max-width:800px;margin:40px auto;padding:24px;background:white;border-radius:16px}
+    h1{margin-top:0}label{display:block;margin-top:20px}input,textarea{box-sizing:border-box;width:100%;padding:12px;border:1px solid #a8bac1;border-radius:8px;font:inherit}
+    button{font:inherit;border:0;border-radius:8px;padding:12px 20px;background:#116b62;color:white;margin:16px 8px 0 0;cursor:pointer}button:disabled{opacity:.5;cursor:wait}
+    pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f3f5f7;padding:16px;border-radius:8px}.note{color:#526870;font-size:14px}#status{min-height:24px}
+  </style>
+</head>
+<body><main>
+  <h1>Payment Planner</h1>
+  <p>Understand transactions, spending, and your preferences. No payments or bank connections.</p>
+  <p class="note">Use synthetic data until you have verified your deployment. Never enter passwords, PINs, full account/card numbers, or banking credentials.</p>
+  <p id="mode" class="note">Checking service…</p>
+  <label for="token">App access token (not your OpenAI key or bank password)</label>
+  <input id="token" type="password" autocomplete="off" placeholder="Your deployment access token">
+  <p class="note">The token stays in this page’s memory only; it is not saved in browser storage.</p>
+  <label for="message">Message</label>
+  <textarea id="message" rows="4" maxlength="6000" placeholder="2026-09-15 UBER *TRIP $20.00"></textarea>
+  <button id="send">Send</button><button id="reset">Clear conversation</button>
+  <p id="status" role="status" aria-live="polite"></p>
+  <pre id="answer">Your answer will appear here.</pre>
+  <details><summary>Usage and execution details</summary><pre id="details"></pre></details>
+</main>
+<script>
+  const $ = id => document.getElementById(id);
+  const thread = crypto.randomUUID();
+  let pending = null;
+  async function request(path, body) {
+    const response = await fetch(path, {method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+$('token').value.trim()},body:JSON.stringify(body)});
+    const data = await response.json();
+    if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Invalid request. Check your message.');
+    return data;
+  }
+  function busy(on) { $('send').disabled = on; $('reset').disabled = on; }
+  $('send').onclick = async () => {
+    const message = $('message').value.trim();
+    if (!message) { $('status').textContent = 'Enter a message first.'; return; }
+    if (!pending || pending.message !== message) pending = {message,thread_id:thread,request_id:crypto.randomUUID()};
+    busy(true); $('status').textContent = 'Working…';
+    try {
+      const data = await request('/chat',pending);
+      $('answer').textContent = data.answer;
+      const {answer,...details} = data;
+      $('details').textContent = JSON.stringify(details,null,2);
+      $('status').textContent = data.cached ? 'Previous result returned safely.' : 'Done.';
+      pending = null;
+    } catch(error) { $('status').textContent = error.message; }
+    finally { busy(false); }
+  };
+  $('reset').onclick = async () => {
+    if (!confirm('Clear this conversation? Saved preferences will remain.')) return;
+    busy(true);
+    try { const data = await request('/reset',{thread_id:thread}); pending=null; $('answer').textContent='Conversation cleared.'; $('details').textContent=''; $('status').textContent=data.message; }
+    catch(error) { $('status').textContent=error.message; }
+    finally { busy(false); }
+  };
+  fetch('/healthz').then(r=>r.json()).then(data=>{
+    $('mode').textContent = data.mode === 'fixture' ? 'Offline fixture mode: parsing and categorization only; no AI calls or long-term recall.' : 'Live OpenAI mode: server-side tools, SQLite history, and preference memory.';
+  }).catch(()=>{$('mode').textContent='Service unavailable.';});
+</script></body></html>
