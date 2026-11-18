@@ -1,0 +1,11 @@
+.env
+.venv/
+__pycache__/
+*.py[cod]
+.DS_Store
+data/*.db
+data/*.db-*
+data/planner_profile.json
+data/transaction_chroma/
+data/long_term_memory/
+:memory:.ses
